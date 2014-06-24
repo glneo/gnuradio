@@ -8,7 +8,7 @@
   <name>ATSC Receive Pipeline</name>
   <key>dtv_atsc_rx</key>
   <import>from gnuradio import dtv</import>
-  <make>dtv.atsc_rx($rate,$sps)</make>
+  <make>dtv.atsc_rx_block($rate,$sps)</make>
 
   <param>
     <name>Input Rate</name>

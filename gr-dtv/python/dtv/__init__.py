@@ -34,4 +34,4 @@ except ImportError:
     from dtv_swig import *
 
 # Import pure python code here
-from atsc_rx import *
+from atsc_rx_block import *

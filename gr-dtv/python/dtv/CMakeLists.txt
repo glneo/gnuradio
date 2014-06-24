@@ -26,6 +26,7 @@ GR_PYTHON_INSTALL(
     FILES
     __init__.py
     atsc_rx.py
+    atsc_rx_block.py
     atsc_rx_filter.py
     DESTINATION ${GR_PYTHON_DIR}/gnuradio/dtv
     COMPONENT "dtv_python"

@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<!--
+###################################################
+##Process
+###################################################
+ -->
+<block>
+	<name>Process</name>
+	<key>blocks_process</key>
+	<import>from gnuradio import blocks</import>
+	<make>blocks.process($i_type.size*$vlen, $file, $command)</make>
+	<param>
+		<name>Command</name>
+		<key>command</key>
+		<value></value>
+		<type>text</type>
+	</param>
+	<param>
+		<name>Input Type</name>
+		<key>i_type</key>
+		<type>enum</type>
+		<option>
+			<name>Complex</name>
+			<key>complex</key>
+			<opt>size:gr.sizeof_gr_complex</opt>
+		</option>
+		<option>
+			<name>Float</name>
+			<key>float</key>
+			<opt>size:gr.sizeof_float</opt>
+		</option>
+		<option>
+			<name>Int</name>
+			<key>int</key>
+			<opt>size:gr.sizeof_int</opt>
+		</option>
+		<option>
+			<name>Short</name>
+			<key>short</key>
+			<opt>size:gr.sizeof_short</opt>
+		</option>
+		<option>
+			<name>Byte</name>
+			<key>byte</key>
+			<opt>size:gr.sizeof_char</opt>
+		</option>
+	</param>
+	<param>
+		<name>Input Vec Length</name>
+		<key>i_vlen</key>
+		<value>1</value>
+		<type>int</type>
+	</param>
+	<param>
+		<name>Output Type</name>
+		<key>o_type</key>
+		<type>enum</type>
+		<option>
+			<name>Complex</name>
+			<key>complex</key>
+			<opt>size:gr.sizeof_gr_complex</opt>
+		</option>
+		<option>
+			<name>Float</name>
+			<key>float</key>
+			<opt>size:gr.sizeof_float</opt>
+		</option>
+		<option>
+			<name>Int</name>
+			<key>int</key>
+			<opt>size:gr.sizeof_int</opt>
+		</option>
+		<option>
+			<name>Short</name>
+			<key>short</key>
+			<opt>size:gr.sizeof_short</opt>
+		</option>
+		<option>
+			<name>Byte</name>
+			<key>byte</key>
+			<opt>size:gr.sizeof_char</opt>
+		</option>
+	</param>
+	<param>
+		<name>Output Vec Length</name>
+		<key>o_vlen</key>
+		<value>1</value>
+		<type>int</type>
+	</param>
+	<param>
+		<name>Command</name>
+		<key>command</key>
+		<type>text</type>
+	</param>
+	<check>$i_vlen &gt; 0</check>
+	<sink>
+		<name>in</name>
+		<type>$i_type</type>
+		<vlen>$i_vlen</vlen>
+	</sink>
+	<check>$o_vlen &gt; 0</check>
+	<source>
+		<name>out</name>
+		<type>$o_type</type>
+		<vlen>$o_vlen</vlen>
+	</source>
+</block>

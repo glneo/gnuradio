@@ -1,5 +1,5 @@
 /* -*- c++ -*- */
-/* Copyright 2012,2013 Free Software Foundation, Inc.
+/* Copyright 2012-2014 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -221,7 +221,13 @@ namespace gr {
 	  in += d_itemsize;
 	  nread++;
 	  d_state = STATE_FIND_TRIGGER;
-	  // Fall through
+	  // The following break was added to this state as well as STATE_FIND_TRIGGER
+      // and STATE_HEADER. There appears to be a bug somewhere in this code without
+      // the breaks that can lead to failure of this block. With the breaks in the code
+      // testing has shown more stable performance with various block paramters.
+      // If an offset calculation bug is found and fixed, it should be possible to 
+      // remove these breaks for some performance increase.
+    break; 
 
 	case STATE_FIND_TRIGGER:
 	  trigger_offset = find_trigger_signal(nread, noutput_items, input_items);
@@ -234,7 +240,7 @@ namespace gr {
 	  consume_each (trigger_offset);
 	  in += trigger_offset * d_itemsize;
 	  d_state = STATE_HEADER;
-	  // Fall through
+    break;
 
 	case STATE_HEADER:
 	  if (check_items_available(d_header_len, ninput_items, noutput_items, nread)) {
@@ -262,7 +268,7 @@ namespace gr {
 	  consume_each (nread);
 	  in += nread * d_itemsize;
 	  d_state = STATE_PAYLOAD;
-	  // Fall through
+    break;
 
 	case STATE_PAYLOAD:
 	  if (check_items_available(d_curr_payload_len, ninput_items, noutput_items, nread)) {
@@ -274,7 +280,7 @@ namespace gr {
 	    set_min_noutput_items(d_output_symbols ? 1 : (d_items_per_symbol + d_gi));
 	    d_state = STATE_FIND_TRIGGER;
 	  }
-	  break;
+	break;
 
 	default:
 	  throw std::runtime_error("invalid state");
@@ -300,20 +306,19 @@ namespace gr {
 	}
       }
       if (d_uses_trigger_tag) {
-	std::vector<tag_t> tags;
-	get_tags_in_range(tags, 0, nitems_read(0), nitems_read(0)+noutput_items, d_trigger_tag_key);
-	uint64_t min_offset = ULLONG_MAX;
-	int tag_index = -1;
-	for (unsigned i = 0; i < tags.size(); i++) {
-	  if (tags[i].offset < min_offset) {
-	    tag_index = (int) i;
-	    min_offset = tags[i].offset;
-	  }
-	}
-	if (tag_index != -1) {
-	  remove_item_tag(0, tags[tag_index]);
-	  return min_offset - nitems_read(0);
-	}
+        std::vector<tag_t> tags;
+        get_tags_in_range(tags, 0, nitems_read(0), nitems_read(0)+noutput_items, d_trigger_tag_key);
+        uint64_t min_offset = ULLONG_MAX;
+        int tag_index = -1;
+        for (unsigned i = 0; i < tags.size(); i++) {
+          if (tags[i].offset < min_offset) {
+            tag_index = (int) i;
+            min_offset = tags[i].offset;
+          }
+        }
+        if (tag_index != -1) {
+          return min_offset - nitems_read(0);
+        }
       }
       return -1;
     } /* find_trigger_signal() */
@@ -388,26 +393,30 @@ namespace gr {
       // Copy tags
       std::vector<tag_t> tags;
       get_tags_in_range(
-	  tags, 0,
-	  nitems_read(0),
-	  nitems_read(0) + n_symbols * (d_items_per_symbol + d_gi)
+          tags, 0,
+          nitems_read(0),
+          nitems_read(0) + n_symbols * (d_items_per_symbol + d_gi)
       );
-      for (unsigned t = 0; t < tags.size(); t++) {
-	int new_offset = tags[t].offset - nitems_read(0);
-	if (d_output_symbols) {
-	  new_offset /= (d_items_per_symbol + d_gi);
-	} else if (d_gi) {
-	  int pos_on_symbol = (new_offset % (d_items_per_symbol + d_gi)) - d_gi;
-	  if (pos_on_symbol < 0) {
-	    pos_on_symbol = 0;
-	  }
-	  new_offset = (new_offset / (d_items_per_symbol + d_gi)) + pos_on_symbol;
-	}
-	add_item_tag(port,
-	    nitems_written(port) + new_offset,
-	    tags[t].key,
-	    tags[t].value
-	);
+      for (size_t t = 0; t < tags.size(); t++) {
+        // The trigger tag is *not* propagated
+        if (tags[t].key == d_trigger_tag_key) {
+          continue;
+        }
+        int new_offset = tags[t].offset - nitems_read(0);
+        if (d_output_symbols) {
+          new_offset /= (d_items_per_symbol + d_gi);
+        } else if (d_gi) {
+          int pos_on_symbol = (new_offset % (d_items_per_symbol + d_gi)) - d_gi;
+          if (pos_on_symbol < 0) {
+            pos_on_symbol = 0;
+          }
+          new_offset = (new_offset / (d_items_per_symbol + d_gi)) + pos_on_symbol;
+        }
+        add_item_tag(port,
+            nitems_written(port) + new_offset,
+            tags[t].key,
+            tags[t].value
+        );
       }
     } /* copy_n_symbols() */
 

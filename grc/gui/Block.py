@@ -22,10 +22,11 @@ import Utils
 import Colors
 from .. base import odict
 from Constants import BORDER_PROXIMITY_SENSITIVITY
-from Constants import \
-    BLOCK_LABEL_PADDING, \
-    PORT_SEPARATION, LABEL_SEPARATION, \
-    PORT_BORDER_SEPARATION, POSSIBLE_ROTATIONS
+from Constants import (
+    BLOCK_LABEL_PADDING, PORT_SPACING, PORT_SEPARATION, LABEL_SEPARATION,
+    PORT_BORDER_SEPARATION, POSSIBLE_ROTATIONS, BLOCK_FONT, PARAM_FONT
+)
+import Actions
 import pygtk
 pygtk.require('2.0')
 import gtk
@@ -33,7 +34,10 @@ import pango
 
 BLOCK_MARKUP_TMPL="""\
 #set $foreground = $block.is_valid() and 'black' or 'red'
-<span foreground="$foreground" font_desc="Sans 8"><b>$encode($block.get_name())</b></span>"""
+<span foreground="$foreground" font_desc="$font"><b>$encode($block.get_name())</b></span>"""
+COMMENT_MARKUP_TMPL="""\
+#set $foreground = $block.get_enabled() and '#444' or '#888'
+<span foreground="$foreground" font_desc="$font">$encode($block.get_comment())</span>"""
 
 class Block(Element):
     """The graphical signal block."""
@@ -43,6 +47,8 @@ class Block(Element):
         Block contructor.
         Add graphics related params to the block.
         """
+        self.W = 0
+        self.H = 0
         #add the position param
         self.get_params().append(self.get_parent().get_parent().Param(
             block=self,
@@ -65,6 +71,8 @@ class Block(Element):
             })
         ))
         Element.__init__(self)
+        self._comment_pixmap = None
+        self.has_busses = [False, False]  # source, sink
 
     def get_coordinate(self):
         """
@@ -97,6 +105,12 @@ class Block(Element):
         Args:
             coor: the coordinate tuple (x, y)
         """
+        if Actions.TOGGLE_SNAP_TO_GRID.get_active():
+            offset_x, offset_y = (0, self.H/2) if self.is_horizontal() else (self.H/2, 0)
+            coor = (
+                Utils.align_to_grid(coor[0] + offset_x) - offset_x,
+                Utils.align_to_grid(coor[1] + offset_y) - offset_y
+            )
         self.get_param('_coordinate').set_value(str(coor))
 
     def get_rotation(self):
@@ -132,16 +146,20 @@ class Block(Element):
         """Create the labels for the signal block."""
         Element.create_labels(self)
         self._bg_color = self.is_dummy_block() and Colors.MISSING_BLOCK_BACKGROUND_COLOR or \
+                         self.get_bypassed() and Colors.BLOCK_BYPASSED_COLOR or \
                          self.get_enabled() and Colors.BLOCK_ENABLED_COLOR or Colors.BLOCK_DISABLED_COLOR
+
         layouts = list()
         #create the main layout
         layout = gtk.DrawingArea().create_pango_layout('')
         layouts.append(layout)
-        layout.set_markup(Utils.parse_template(BLOCK_MARKUP_TMPL, block=self))
+        layout.set_markup(Utils.parse_template(BLOCK_MARKUP_TMPL, block=self, font=BLOCK_FONT))
         self.label_width, self.label_height = layout.get_pixel_size()
         #display the params
         if self.is_dummy_block():
-            markups = ['<span foreground="black" font_desc="Sans 7.5"><b>key: </b>{}</span>'.format(self._key)]
+            markups = [
+                '<span foreground="black" font_desc="$font"><b>key: </b>{key}</span>'.format(font=PARAM_FONT, key=self._key)
+            ]
         else:
             markups = [param.get_markup() for param in self.get_params() if param.get_hide() not in ('all', 'part')]
         if markups:
@@ -173,22 +191,46 @@ class Block(Element):
             self.vertical_label = self.get_parent().new_pixmap(height, width)
             Utils.rotate_pixmap(gc, self.horizontal_label, self.vertical_label)
         #calculate width and height needed
-        self.W = self.label_width + 2*BLOCK_LABEL_PADDING
-        self.H = max(*(
+        self.W = self.label_width + 2 * BLOCK_LABEL_PADDING
+
+        def get_min_height_for_ports():
+            visible_ports = filter(lambda p: not p.get_hide(), ports)
+            H = 2*PORT_BORDER_SEPARATION + len(visible_ports) * PORT_SEPARATION
+            if visible_ports: H -= ports[0].H
+            return H
+        self.H = max(
             [  # labels
                 self.label_height + 2 * BLOCK_LABEL_PADDING
             ] +
             [  # ports
-                2 * PORT_BORDER_SEPARATION +
-                sum([port.H + PORT_SEPARATION for port in ports if not port.get_hide()]) - PORT_SEPARATION
-                for ports in (self.get_sources_gui(), self.get_sinks_gui())
+                get_min_height_for_ports() for ports in (self.get_sources_gui(), self.get_sinks_gui())
             ] +
             [  # bus ports only
-                4 * PORT_BORDER_SEPARATION +
-                sum([port.H + PORT_SEPARATION for port in ports if port.get_type() == 'bus']) - PORT_SEPARATION
+                2 * PORT_BORDER_SEPARATION +
+                sum([port.H + PORT_SPACING for port in ports if port.get_type() == 'bus']) - PORT_SPACING
                 for ports in (self.get_sources_gui(), self.get_sinks_gui())
             ]
-        ))
+        )
+        self.has_busses = [
+            any(port.get_type() == 'bus' for port in ports)
+            for ports in (self.get_sources_gui(), self.get_sinks_gui())
+        ]
+        self.create_comment_label()
+
+    def create_comment_label(self):
+        comment = self.get_comment()
+        if comment:
+            layout = gtk.DrawingArea().create_pango_layout('')
+            layout.set_markup(Utils.parse_template(COMMENT_MARKUP_TMPL, block=self, font=BLOCK_FONT))
+            width, height = layout.get_pixel_size()
+            pixmap = self.get_parent().new_pixmap(width, height)
+            gc = pixmap.new_gc()
+            gc.set_foreground(Colors.COMMENT_BACKGROUND_COLOR)
+            pixmap.draw_rectangle(gc, True, 0, 0, width, height)
+            pixmap.draw_layout(gc, 0, 0, layout)
+            self._comment_pixmap = pixmap
+        else:
+            self._comment_pixmap = None
 
     def draw(self, gc, window):
         """
@@ -198,8 +240,11 @@ class Block(Element):
             gc: the graphics context
             window: the gtk window to draw on
         """
+        # draw ports
+        for port in self.get_ports_gui():
+            port.draw(gc, window)
+        # draw main block
         x, y = self.get_coordinate()
-        #draw main block
         Element.draw(
             self, gc, window, bg_color=self._bg_color,
             border_color=self.is_highlighted() and Colors.HIGHLIGHT_COLOR or
@@ -210,10 +255,6 @@ class Block(Element):
             window.draw_drawable(gc, self.horizontal_label, 0, 0, x+BLOCK_LABEL_PADDING, y+(self.H-self.label_height)/2, -1, -1)
         elif self.is_vertical():
             window.draw_drawable(gc, self.vertical_label, 0, 0, x+(self.H-self.label_height)/2, y+BLOCK_LABEL_PADDING, -1, -1)
-        #draw ports
-        for port in self.get_ports_gui():
-            if not port.get_hide():
-                port.draw(gc, window)
 
     def what_is_selected(self, coor, coor_m=None):
         """
@@ -230,3 +271,11 @@ class Block(Element):
             port_selected = port.what_is_selected(coor, coor_m)
             if port_selected: return port_selected
         return Element.what_is_selected(self, coor, coor_m)
+
+    def draw_comment(self, gc, window):
+        if not self._comment_pixmap:
+            return
+
+        x, y = self.get_coordinate()
+        window.draw_drawable(gc, self._comment_pixmap, 0, 0, x,
+                             y + self.H + BLOCK_LABEL_PADDING, -1, -1)

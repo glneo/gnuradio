@@ -31,6 +31,7 @@ install(FILES
   DisplayPlot.h
   form_menus.h
   freqdisplayform.h
+  freqcontrolpanel.h
   freq_sink_c.h
   freq_sink_f.h
   FrequencyDisplayPlot.h
@@ -48,6 +49,7 @@ install(FILES
   SpectrumGUIClass.h
   spectrumUpdateEvents.h
   timedisplayform.h
+  timecontrolpanel.h
   TimeDomainDisplayPlot.h
   timerasterdisplayform.h
   TimeRasterDisplayPlot.h
@@ -63,6 +65,9 @@ install(FILES
   waterfallGlobalData.h
   waterfall_sink_c.h
   waterfall_sink_f.h
+  vectordisplayform.h
+  VectorDisplayPlot.h
+  vector_sink_f.h
   DESTINATION ${GR_INCLUDE_DIR}/gnuradio/qtgui
   COMPONENT "qtgui_devel"
 )

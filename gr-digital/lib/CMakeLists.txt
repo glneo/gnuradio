@@ -38,7 +38,6 @@ link_directories(${LOG4CPP_LIBRARY_DIRS})
 
 if(ENABLE_GR_CTRLPORT)
   ADD_DEFINITIONS(-DGR_CTRLPORT)
-  include_directories(${ICE_INCLUDE_DIR})
 endif(ENABLE_GR_CTRLPORT)
 
 ########################################################################
@@ -46,6 +45,7 @@ endif(ENABLE_GR_CTRLPORT)
 ########################################################################
 include(GrMiscUtils)
 GR_EXPAND_X_CC_H(digital chunks_to_symbols_XX_impl     bf bc sf sc if ic)
+GR_EXPAND_X_CC_H(digital burst_shaper_XX_impl     cc ff)
 
 ########################################################################
 # Setup library
@@ -61,6 +61,7 @@ list(APPEND digital_sources
     constellation_decoder_cb_impl.cc
     constellation_receiver_cb_impl.cc
     constellation_soft_decoder_cf_impl.cc
+    corr_est_cc_impl.cc
     correlate_access_code_bb_impl.cc
     correlate_access_code_tag_bb_impl.cc
     correlate_access_code_bb_ts_impl.cc
@@ -86,9 +87,11 @@ list(APPEND digital_sources
     kurtotic_equalizer_cc_impl.cc
     lms_dd_equalizer_cc_impl.cc
     map_bb_impl.cc
+    modulate_vector.cc
     mpsk_receiver_cc_impl.cc
     mpsk_snr_est.cc
     mpsk_snr_est_cc_impl.cc
+    msk_timing_recovery_cc_impl.cc
     ofdm_carrier_allocator_cvc_impl.cc
     ofdm_chanest_vcvc_impl.cc
     ofdm_cyclic_prefixer_impl.cc
@@ -133,11 +136,11 @@ IF(MSVC)
 ENDIF(MSVC)
 
 list(APPEND digital_libs
-    volk
     gnuradio-runtime
     gnuradio-filter
     gnuradio-blocks
     gnuradio-analog
+    ${VOLK_LIBRARIES}
     ${Boost_LIBRARIES}
     ${LOG4CPP_LIBRARIES}
 )
@@ -160,7 +163,6 @@ if(ENABLE_STATIC_LIBS)
   if(ENABLE_GR_CTRLPORT)
     # Remove GR_CTRLPORT set this target's definitions.
     # Makes sure we don't try to use ControlPort stuff in source files
-    # since Ice will not work with static libs.
     GET_DIRECTORY_PROPERTY(STATIC_DEFS COMPILE_DEFINITIONS)
     list(REMOVE_ITEM STATIC_DEFS "GR_CTRLPORT")
     SET_PROPERTY(DIRECTORY PROPERTY COMPILE_DEFINITIONS "${STATIC_DEFS}")

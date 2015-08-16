@@ -49,13 +49,12 @@ TOOLBAR_LIST = (
     None,
     Actions.BLOCK_ENABLE,
     Actions.BLOCK_DISABLE,
+    Actions.BLOCK_BYPASS,
     Actions.TOGGLE_HIDE_DISABLED_BLOCKS,
     None,
     Actions.FIND_BLOCKS,
     Actions.RELOAD_BLOCKS,
     Actions.OPEN_HIER,
-    Actions.BUSSIFY_SOURCES,
-    Actions.CLEAR_REPORTS,
 )
 
 ##The list of actions and categories for the menu bar.
@@ -87,6 +86,7 @@ MENU_BAR_LIST = (
         None,
         Actions.BLOCK_ENABLE,
         Actions.BLOCK_DISABLE,
+        Actions.BLOCK_BYPASS,
         None,
         Actions.BLOCK_PARAM_MODIFY,
     ]),
@@ -95,15 +95,20 @@ MENU_BAR_LIST = (
         None,
         Actions.TOGGLE_REPORTS_WINDOW,
         Actions.TOGGLE_SCROLL_LOCK,
+        Actions.SAVE_REPORTS,
         Actions.CLEAR_REPORTS,
         None,
         Actions.TOGGLE_HIDE_DISABLED_BLOCKS,
         Actions.TOGGLE_AUTO_HIDE_PORT_LABELS,
+        Actions.TOGGLE_SNAP_TO_GRID,
+        Actions.TOGGLE_SHOW_BLOCK_COMMENTS,
+        None,
+        Actions.TOGGLE_SHOW_CODE_PREVIEW_TAB,
         None,
         Actions.ERRORS_WINDOW_DISPLAY,
         Actions.FIND_BLOCKS,
     ]),
-    (gtk.Action('Build', '_Build', None, None), [
+    (gtk.Action('Run', '_Run', None, None), [
         Actions.FLOW_GRAPH_GEN,
         Actions.FLOW_GRAPH_EXEC,
         Actions.FLOW_GRAPH_KILL,
@@ -121,6 +126,31 @@ MENU_BAR_LIST = (
         Actions.ABOUT_WINDOW_DISPLAY,
     ]),
 )
+
+
+CONTEXT_MENU_LIST = [
+    Actions.BLOCK_CUT,
+    Actions.BLOCK_COPY,
+    Actions.BLOCK_PASTE,
+    Actions.ELEMENT_DELETE,
+    None,
+    Actions.BLOCK_ROTATE_CCW,
+    Actions.BLOCK_ROTATE_CW,
+    Actions.BLOCK_ENABLE,
+    Actions.BLOCK_DISABLE,
+    Actions.BLOCK_BYPASS,
+    None,
+    (gtk.Action('More', '_More', None, None), [
+        Actions.BLOCK_CREATE_HIER,
+        Actions.OPEN_HIER,
+        None,
+        Actions.BUSSIFY_SOURCES,
+        Actions.BUSSIFY_SINKS,
+    ]),
+    Actions.BLOCK_PARAM_MODIFY
+]
+
+
 class Toolbar(gtk.Toolbar):
     """The gtk toolbar with actions added from the toolbar list."""
 
@@ -137,6 +167,7 @@ class Toolbar(gtk.Toolbar):
                 #this reset of the tooltip property is required (after creating the tool item) for the tooltip to show
                 action.set_property('tooltip', action.get_property('tooltip'))
             else: self.add(gtk.SeparatorToolItem())
+
 
 class MenuBar(gtk.MenuBar):
     """The gtk menu bar with actions added from the menu bar list."""
@@ -157,7 +188,29 @@ class MenuBar(gtk.MenuBar):
             main_menu = gtk.Menu()
             main_menu_item.set_submenu(main_menu)
             for action in actions:
-                if action: #append a menu item
-                    main_menu.append(action.create_menu_item())
-                else: main_menu.append(gtk.SeparatorMenuItem())
+                main_menu.append(action.create_menu_item() if action else
+                                 gtk.SeparatorMenuItem())
             main_menu.show_all() #this show all is required for the separators to show
+
+
+class ContextMenu(gtk.Menu):
+    """The gtk menu with actions added from the context menu list."""
+
+    def __init__(self):
+        gtk.Menu.__init__(self)
+        for action in CONTEXT_MENU_LIST:
+            if isinstance(action, tuple):
+                action, sub_menu_action_list = action
+                item = action.create_menu_item()
+                self.append(item)
+                sub_menu = gtk.Menu()
+                item.set_submenu(sub_menu)
+                for action in sub_menu_action_list:
+                    sub_menu.append(action.create_menu_item() if action else
+                                    gtk.SeparatorMenuItem())
+                sub_menu.show_all()
+
+            else:
+                self.append(action.create_menu_item() if action else
+                            gtk.SeparatorMenuItem())
+        self.show_all()

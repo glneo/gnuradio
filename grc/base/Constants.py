@@ -24,6 +24,27 @@ DATA_DIR = os.path.dirname(__file__)
 FLOW_GRAPH_DTD = os.path.join(DATA_DIR, 'flow_graph.dtd')
 BLOCK_TREE_DTD = os.path.join(DATA_DIR, 'block_tree.dtd')
 
+# file format versions:
+#  0: undefined / legacy
+#  1: non-numeric message port keys (label is used instead)
+FLOW_GRAPH_FILE_FORMAT_VERSION = 1
+
 # Param tabs
 DEFAULT_PARAM_TAB = "General"
 ADVANCED_PARAM_TAB = "Advanced"
+
+# Port domains
+DOMAIN_DTD = os.path.join(DATA_DIR, 'domain.dtd')
+GR_STREAM_DOMAIN = "gr_stream"
+GR_MESSAGE_DOMAIN = "gr_message"
+DEFAULT_DOMAIN = GR_STREAM_DOMAIN
+
+BLOCK_FLAG_THROTTLE = 'throttle'
+BLOCK_FLAG_DISABLE_BYPASS = 'disable_bypass'
+BLOCK_FLAG_NEED_QT_GUI = 'need_qt_gui'
+BLOCK_FLAG_NEED_WX_GUI = 'need_ex_gui'
+
+# Block States
+BLOCK_DISABLED = 0
+BLOCK_ENABLED = 1
+BLOCK_BYPASSED = 2

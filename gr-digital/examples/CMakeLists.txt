@@ -31,6 +31,13 @@ GR_PYTHON_INSTALL(PROGRAMS
     COMPONENT "digital_python"
 )
 
+install(
+    FILES
+    burst_shaper.grc
+    DESTINATION ${GR_PKG_DIGITAL_EXAMPLES_DIR}
+    COMPONENT "digital_python"
+)
+
 # Narrowband
 GR_PYTHON_INSTALL(PROGRAMS
     narrowband/transmit_path.py
@@ -73,14 +80,16 @@ install(
 # DEMOD
 install(
     FILES
+    demod/constellation_soft_decoder.grc
     demod/digital_freq_lock.grc
     demod/mpsk_demod.grc
     demod/pam_sync.grc
     demod/pam_timing.grc
     demod/ber_simulation.grc
-    demod/dpsk_loopback.grc   
+    demod/dpsk_loopback.grc
     demod/gfsk_loopback.grc
     demod/test_corr_and_sync.grc
+    demod/test_corr_est.grc
     demod/uhd_corr_and_sync_tx.grc
     demod/uhd_corr_and_sync_rx.grc
     DESTINATION ${GR_PKG_DIGITAL_EXAMPLES_DIR}/demod

@@ -15,13 +15,14 @@ find_path(QWT_INCLUDE_DIRS
   /usr/include/qwt6
   /usr/include/qwt-qt4
   /usr/include/qwt
+  /usr/include/qwt5
   /opt/local/include/qwt
   /sw/include/qwt
   /usr/local/lib/qwt.framework/Headers
 )
 
 find_library (QWT_LIBRARIES
-  NAMES qwt6 qwt qwt-qt4
+  NAMES qwt6 qwt6-qt4 qwt qwt-qt4
   HINTS
   ${CMAKE_INSTALL_PREFIX}/lib
   ${CMAKE_INSTALL_PREFIX}/lib64

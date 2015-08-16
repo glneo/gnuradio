@@ -25,15 +25,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
     Top level element.
     A block contains a name, ...parameters list, and list of IO ports.
  -->
-<!ELEMENT block (name, key, category?, throttle?, import*, var_make?, var_value?, make, callback*, param_tab_order?, param*, bus_sink?, bus_source?, check*, sink*, source*, bus_structure_sink?, bus_structure_source?, doc?,  grc_source?)>
+<!ELEMENT block (name, key, category?, throttle?, flags?, import*, var_make?, var_value?,
+        make, callback*, param_tab_order?, param*, bus_sink?, bus_source?, check*,
+        sink*, source*, bus_structure_sink?, bus_structure_source?, doc?,  grc_source?)>
 <!--
     Sub level elements.
  -->
 <!ELEMENT param_tab_order (tab+)>
 <!ELEMENT param (base_key?, name, key, value?, type?, hide?, option*, tab?)>
 <!ELEMENT option (name, key, opt*)>
-<!ELEMENT sink (name, type, vlen?, nports?, optional?, hide?)>
-<!ELEMENT source (name, type, vlen?, nports?, optional?, hide?)>
+<!ELEMENT sink (name, type, vlen?, domain?, nports?, optional?, hide?)>
+<!ELEMENT source (name, type, vlen?, domain?, nports?, optional?, hide?)>
 <!--
     Bottom level elements.
     Character data only.
@@ -53,6 +55,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 <!ELEMENT type (#PCDATA)>
 <!ELEMENT hide (#PCDATA)>
 <!ELEMENT vlen (#PCDATA)>
+<!ELEMENT domain (#PCDATA)>
 <!ELEMENT nports (#PCDATA)>
 <!ELEMENT bus_structure_sink (#PCDATA)>
 <!ELEMENT bus_structure_source (#PCDATA)>
@@ -63,3 +66,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 <!ELEMENT callback (#PCDATA)>
 <!ELEMENT optional (#PCDATA)>
 <!ELEMENT throttle (#PCDATA)>
+<!ELEMENT flags (#PCDATA)>

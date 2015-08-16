@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 """
 
 import os
-import signal
 from Constants import IMAGE_FILE_EXTENSION
 import Actions
 import pygtk
@@ -29,14 +28,16 @@ import subprocess
 import Preferences
 from threading import Thread
 import Messages
-from .. base import ParseXML
+from .. base import ParseXML, Constants
 from MainWindow import MainWindow
 from PropsDialog import PropsDialog
 from ParserErrorsDialog import ParserErrorsDialog
 import Dialogs
-from FileDialogs import OpenFlowGraphFileDialog, SaveFlowGraphFileDialog, SaveImageFileDialog
+from FileDialogs import OpenFlowGraphFileDialog, SaveFlowGraphFileDialog, SaveReportsFileDialog, SaveImageFileDialog
+from . Constants import DEFAULT_CANVAS_SIZE
 
 gobject.threads_init()
+
 
 class ActionHandler:
     """
@@ -86,7 +87,10 @@ class ActionHandler:
             false to let gtk handle the key action
         """
         # prevent key event stealing while the search box is active
-        if self.main_window.btwin.search_entry.has_focus(): return False
+        # .has_focus() only in newer versions 2.17+?
+        # .is_focus() seems to work, but exactly the same
+        if self.main_window.btwin.search_entry.flags() & gtk.HAS_FOCUS:
+            return False
         if not self.get_focus_flag(): return False
         return Actions.handle_key_press(event)
 
@@ -105,7 +109,7 @@ class ActionHandler:
     def _handle_action(self, action):
         #print action
         ##################################################
-        # Initalize/Quit
+        # Initialize/Quit
         ##################################################
         if action == Actions.APPLICATION_INITIALIZE:
             for action in Actions.get_all_actions(): action.set_sensitive(False) #set all actions disabled
@@ -117,15 +121,18 @@ class ActionHandler:
                 Actions.FLOW_GRAPH_SCREEN_CAPTURE, Actions.HELP_WINDOW_DISPLAY,
                 Actions.TYPES_WINDOW_DISPLAY, Actions.TOGGLE_BLOCKS_WINDOW,
                 Actions.TOGGLE_REPORTS_WINDOW, Actions.TOGGLE_HIDE_DISABLED_BLOCKS,
-                Actions.TOOLS_RUN_FDESIGN, Actions.TOGGLE_SCROLL_LOCK, Actions.CLEAR_REPORTS,
-                Actions.TOGGLE_AUTO_HIDE_PORT_LABELS
+                Actions.TOOLS_RUN_FDESIGN, Actions.TOGGLE_SCROLL_LOCK,
+                Actions.CLEAR_REPORTS, Actions.SAVE_REPORTS,
+                Actions.TOGGLE_AUTO_HIDE_PORT_LABELS, Actions.TOGGLE_SNAP_TO_GRID,
+                Actions.TOGGLE_SHOW_BLOCK_COMMENTS,
+                Actions.TOGGLE_SHOW_CODE_PREVIEW_TAB,
             ): action.set_sensitive(True)
             if ParseXML.xml_failures:
                 Messages.send_xml_errors_if_any(ParseXML.xml_failures)
                 Actions.XML_PARSER_ERRORS_DISPLAY.set_sensitive(True)
 
             if not self.init_file_paths:
-                self.init_file_paths = Preferences.files_open()
+                self.init_file_paths = filter(os.path.exists, Preferences.files_open())
             if not self.init_file_paths: self.init_file_paths = ['']
             for file_path in self.init_file_paths:
                 if file_path: self.main_window.new_page(file_path) #load pages from file paths
@@ -134,10 +141,15 @@ class ActionHandler:
             if not self.get_page(): self.main_window.new_page() #ensure that at least a blank page exists
 
             self.main_window.btwin.search_entry.hide()
-            Actions.TOGGLE_REPORTS_WINDOW.set_active(Preferences.reports_window_visibility())
-            Actions.TOGGLE_BLOCKS_WINDOW.set_active(Preferences.blocks_window_visibility())
-            Actions.TOGGLE_SCROLL_LOCK.set_active(Preferences.scroll_lock())
-            Actions.TOGGLE_AUTO_HIDE_PORT_LABELS.set_active(Preferences.auto_hide_port_labels())
+            for action in (
+                Actions.TOGGLE_REPORTS_WINDOW,
+                Actions.TOGGLE_BLOCKS_WINDOW,
+                Actions.TOGGLE_AUTO_HIDE_PORT_LABELS,
+                Actions.TOGGLE_SCROLL_LOCK,
+                Actions.TOGGLE_SNAP_TO_GRID,
+                Actions.TOGGLE_SHOW_BLOCK_COMMENTS,
+                Actions.TOGGLE_SHOW_CODE_PREVIEW_TAB,
+            ): action.load_from_preferences()
         elif action == Actions.APPLICATION_QUIT:
             if self.main_window.close_pages():
                 gtk.main_quit()
@@ -159,6 +171,11 @@ class ActionHandler:
                 self.get_page().set_saved(False)
         elif action == Actions.BLOCK_DISABLE:
             if self.get_flow_graph().enable_selected(False):
+                self.get_flow_graph().update()
+                self.get_page().get_state_cache().save_new_state(self.get_flow_graph().export_data())
+                self.get_page().set_saved(False)
+        elif action == Actions.BLOCK_BYPASS:
+            if self.get_flow_graph().bypass_selected():
                 self.get_flow_graph().update()
                 self.get_page().get_state_cache().save_new_state(self.get_flow_graph().export_data())
                 self.get_page().set_saved(False)
@@ -363,47 +380,63 @@ class ActionHandler:
         elif action == Actions.ERRORS_WINDOW_DISPLAY:
             Dialogs.ErrorsDialog(self.get_flow_graph())
         elif action == Actions.TOGGLE_REPORTS_WINDOW:
-            visible = action.get_active()
-            if visible:
+            if action.get_active():
                 self.main_window.reports_scrolled_window.show()
             else:
                 self.main_window.reports_scrolled_window.hide()
-            Preferences.reports_window_visibility(visible)
+            action.save_to_preferences()
         elif action == Actions.TOGGLE_BLOCKS_WINDOW:
-            visible = action.get_active()
-            if visible:
+            if action.get_active():
                 self.main_window.btwin.show()
             else:
                 self.main_window.btwin.hide()
-            Preferences.blocks_window_visibility(visible)
+            action.save_to_preferences()
         elif action == Actions.TOGGLE_SCROLL_LOCK:
-            visible = action.get_active()
-            self.main_window.text_display.scroll_lock = visible
-            if visible:
+            active = action.get_active()
+            self.main_window.text_display.scroll_lock = active
+            if active:
                 self.main_window.text_display.scroll_to_end()
+            action.save_to_preferences()
         elif action == Actions.CLEAR_REPORTS:
             self.main_window.text_display.clear()
+        elif action == Actions.SAVE_REPORTS:
+            file_path = SaveReportsFileDialog(self.get_page().get_file_path()).run()
+            if file_path is not None:
+                self.main_window.text_display.save(file_path)
         elif action == Actions.TOGGLE_HIDE_DISABLED_BLOCKS:
             Actions.NOTHING_SELECT()
         elif action == Actions.TOGGLE_AUTO_HIDE_PORT_LABELS:
-            Preferences.auto_hide_port_labels(action.get_active())
-            self.main_window.get_flow_graph().create_shapes()
+            action.save_to_preferences()
+            for page in self.main_window.get_pages():
+                page.get_flow_graph().create_shapes()
+        elif action == Actions.TOGGLE_SNAP_TO_GRID:
+            action.save_to_preferences()
+        elif action == Actions.TOGGLE_SHOW_BLOCK_COMMENTS:
+            action.save_to_preferences()
+        elif action == Actions.TOGGLE_SHOW_CODE_PREVIEW_TAB:
+            action.save_to_preferences()
         ##################################################
         # Param Modifications
         ##################################################
         elif action == Actions.BLOCK_PARAM_MODIFY:
             selected_block = self.get_flow_graph().get_selected_block()
             if selected_block:
-                if PropsDialog(selected_block).run():
-                    #save the new state
-                    self.get_flow_graph().update()
-                    self.get_page().get_state_cache().save_new_state(self.get_flow_graph().export_data())
-                    self.get_page().set_saved(False)
-                else:
-                    #restore the current state
-                    n = self.get_page().get_state_cache().get_current_state()
-                    self.get_flow_graph().import_data(n)
-                    self.get_flow_graph().update()
+                dialog = PropsDialog(selected_block)
+                response = gtk.RESPONSE_APPLY
+                while response == gtk.RESPONSE_APPLY:  # rerun the dialog if Apply was hit
+                    response = dialog.run()
+                    if response in (gtk.RESPONSE_APPLY, gtk.RESPONSE_ACCEPT):
+                        self.get_flow_graph().update()
+                        self.get_page().get_state_cache().save_new_state(self.get_flow_graph().export_data())
+                        self.get_page().set_saved(False)
+                    else:  # restore the current state
+                        n = self.get_page().get_state_cache().get_current_state()
+                        self.get_flow_graph().import_data(n)
+                        self.get_flow_graph().update()
+                    if response == gtk.RESPONSE_APPLY:
+                        # null action, that updates the main window
+                        Actions.ELEMENT_SELECT()
+                dialog.destroy()
         ##################################################
         # View Parser Errors
         ##################################################
@@ -482,9 +515,11 @@ class ActionHandler:
                     ExecFlowGraphThread(self)
         elif action == Actions.FLOW_GRAPH_KILL:
             if self.get_page().get_proc():
-                try: self.get_page().get_proc().kill()
-                except: print "could not kill process: %d"%self.get_page().get_proc().pid
-        elif action == Actions.PAGE_CHANGE: #pass and run the global actions
+                try:
+                    self.get_page().get_proc().kill()
+                except:
+                    print "could not kill process: %d" % self.get_page().get_proc().pid
+        elif action == Actions.PAGE_CHANGE:  # pass and run the global actions
             pass
         elif action == Actions.RELOAD_BLOCKS:
             self.platform.load_blocks()
@@ -492,12 +527,14 @@ class ActionHandler:
             self.platform.load_block_tree(self.main_window.btwin)
             Actions.XML_PARSER_ERRORS_DISPLAY.set_sensitive(bool(ParseXML.xml_failures))
             Messages.send_xml_errors_if_any(ParseXML.xml_failures)
+            # Force a redraw of the graph, by getting the current state and re-importing it
+            self.main_window.update_pages()
+
         elif action == Actions.FIND_BLOCKS:
             self.main_window.btwin.show()
             self.main_window.btwin.search_entry.show()
             self.main_window.btwin.search_entry.grab_focus()
         elif action == Actions.OPEN_HIER:
-            bn = [];
             for b in self.get_flow_graph().get_selected_blocks():
                 if b._grc_source:
                     self.main_window.new_page(b._grc_source, show=True)
@@ -526,23 +563,34 @@ class ActionHandler:
         ##################################################
         # Global Actions for all States
         ##################################################
+        selected_block = self.get_flow_graph().get_selected_block()
+        selected_blocks = self.get_flow_graph().get_selected_blocks()
+
         #update general buttons
         Actions.ERRORS_WINDOW_DISPLAY.set_sensitive(not self.get_flow_graph().is_valid())
         Actions.ELEMENT_DELETE.set_sensitive(bool(self.get_flow_graph().get_selected_elements()))
-        Actions.BLOCK_PARAM_MODIFY.set_sensitive(bool(self.get_flow_graph().get_selected_block()))
-        Actions.BLOCK_ROTATE_CCW.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BLOCK_ROTATE_CW.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
+        Actions.BLOCK_PARAM_MODIFY.set_sensitive(bool(selected_block))
+        Actions.BLOCK_ROTATE_CCW.set_sensitive(bool(selected_blocks))
+        Actions.BLOCK_ROTATE_CW.set_sensitive(bool(selected_blocks))
         #update cut/copy/paste
-        Actions.BLOCK_CUT.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BLOCK_COPY.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
+        Actions.BLOCK_CUT.set_sensitive(bool(selected_blocks))
+        Actions.BLOCK_COPY.set_sensitive(bool(selected_blocks))
         Actions.BLOCK_PASTE.set_sensitive(bool(self.clipboard))
-        #update enable/disable
-        Actions.BLOCK_ENABLE.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BLOCK_DISABLE.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BLOCK_CREATE_HIER.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.OPEN_HIER.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BUSSIFY_SOURCES.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
-        Actions.BUSSIFY_SINKS.set_sensitive(bool(self.get_flow_graph().get_selected_blocks()))
+        #update enable/disable/bypass
+        can_enable = any(block.get_state() != Constants.BLOCK_ENABLED
+                         for block in selected_blocks)
+        can_disable = any(block.get_state() != Constants.BLOCK_DISABLED
+                          for block in selected_blocks)
+        can_bypass_all = all(block.can_bypass() for block in selected_blocks) \
+                          and any (not block.get_bypassed() for block in selected_blocks)
+        Actions.BLOCK_ENABLE.set_sensitive(can_enable)
+        Actions.BLOCK_DISABLE.set_sensitive(can_disable)
+        Actions.BLOCK_BYPASS.set_sensitive(can_bypass_all)
+
+        Actions.BLOCK_CREATE_HIER.set_sensitive(bool(selected_blocks))
+        Actions.OPEN_HIER.set_sensitive(bool(selected_blocks))
+        Actions.BUSSIFY_SOURCES.set_sensitive(bool(selected_blocks))
+        Actions.BUSSIFY_SINKS.set_sensitive(bool(selected_blocks))
         Actions.RELOAD_BLOCKS.set_sensitive(True)
         Actions.FIND_BLOCKS.set_sensitive(True)
         #set the exec and stop buttons
@@ -551,7 +599,8 @@ class ActionHandler:
         Actions.FLOW_GRAPH_SAVE.set_sensitive(not self.get_page().get_saved())
         self.main_window.update()
         try: #set the size of the flow graph area (if changed)
-            new_size = self.get_flow_graph().get_option('window_size')
+            new_size = (self.get_flow_graph().get_option('window_size') or
+                        DEFAULT_CANVAS_SIZE)
             if self.get_flow_graph().get_size() != tuple(new_size):
                 self.get_flow_graph().set_size(*new_size)
         except: pass
@@ -568,7 +617,7 @@ class ActionHandler:
         sensitive = self.get_flow_graph().is_valid() and not self.get_page().get_proc()
         Actions.FLOW_GRAPH_GEN.set_sensitive(sensitive)
         Actions.FLOW_GRAPH_EXEC.set_sensitive(sensitive)
-        Actions.FLOW_GRAPH_KILL.set_sensitive(self.get_page().get_proc() != None)
+        Actions.FLOW_GRAPH_KILL.set_sensitive(self.get_page().get_proc() is not None)
 
 class ExecFlowGraphThread(Thread):
     """Execute the flow graph as a new process and wait on it to finish."""
@@ -604,13 +653,14 @@ class ExecFlowGraphThread(Thread):
         """
         #handle completion
         r = "\n"
-        while(r):
+        while r:
             gobject.idle_add(Messages.send_verbose_exec, r)
             r = os.read(self.p.stdout.fileno(), 1024)
+        self.p.poll()
         gobject.idle_add(self.done)
 
     def done(self):
         """Perform end of execution tasks."""
-        Messages.send_end_exec()
+        Messages.send_end_exec(self.p.returncode)
         self.page.set_proc(None)
         self.update_exec_stop()

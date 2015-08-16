@@ -27,6 +27,7 @@ pygtk.require('2.0')
 import gtk
 import random
 import Messages
+import Bars
 
 class FlowGraph(Element):
     """
@@ -54,25 +55,7 @@ class FlowGraph(Element):
         # current mouse hover element
         self.element_under_mouse = None
         #context menu
-        self._context_menu = gtk.Menu()
-        for action in [
-            Actions.BLOCK_CUT,
-            Actions.BLOCK_COPY,
-            Actions.BLOCK_PASTE,
-            Actions.ELEMENT_DELETE,
-            None,
-            Actions.BLOCK_ROTATE_CCW,
-            Actions.BLOCK_ROTATE_CW,
-            Actions.BLOCK_ENABLE,
-            Actions.BLOCK_DISABLE,
-            None,
-            Actions.BLOCK_CREATE_HIER,
-            Actions.OPEN_HIER,
-            Actions.BUSSIFY_SOURCES,
-            Actions.BUSSIFY_SINKS,
-            None,
-            Actions.BLOCK_PARAM_MODIFY
-        ]: self._context_menu.append(action.create_menu_item() if action else gtk.SeparatorMenuItem())
+        self._context_menu = Bars.ContextMenu()
         self.get_context_menu = lambda: self._context_menu
 
     ###########################################################################
@@ -84,6 +67,7 @@ class FlowGraph(Element):
     def set_size(self, *args): self.get_drawing_area().set_size_request(*args)
     def get_scroll_pane(self): return self.drawing_area.get_parent()
     def get_ctrl_mask(self): return self.drawing_area.ctrl_mask
+    def get_mod1_mask(self): return self.drawing_area.mod1_mask
     def new_pixmap(self, *args): return self.get_drawing_area().new_pixmap(*args)
 
     def add_new_block(self, key, coor=None):
@@ -227,9 +211,21 @@ class FlowGraph(Element):
         """
         changed = False
         for selected_block in self.get_selected_blocks():
-            if selected_block.get_enabled() != enable:
-                selected_block.set_enabled(enable)
-                changed = True
+            if selected_block.set_enabled(enable): changed = True
+        return changed
+
+    def bypass_selected(self):
+        """
+        Bypass the selected blocks.
+
+        Args:
+            None
+        Returns:
+            true if changed
+        """
+        changed = False
+        for selected_block in self.get_selected_blocks():
+            if selected_block.set_bypassed(): changed = True
         return changed
 
     def move_selected(self, delta_coordinate):
@@ -296,6 +292,11 @@ class FlowGraph(Element):
         #draw the background
         gc.set_foreground(Colors.FLOWGRAPH_BACKGROUND_COLOR)
         window.draw_rectangle(gc, True, 0, 0, W, H)
+        # draw comments first
+        if Actions.TOGGLE_SHOW_BLOCK_COMMENTS.get_active():
+            for block in self.get_blocks():
+                if block.get_enabled():
+                    block.draw_comment(gc, window)
         #draw multi select rectangle
         if self.mouse_pressed and (not self.get_selected_elements() or self.get_ctrl_mask()):
             #coordinates
@@ -310,8 +311,9 @@ class FlowGraph(Element):
             gc.set_foreground(Colors.BORDER_COLOR)
             window.draw_rectangle(gc, False, x, y, w, h)
         #draw blocks on top of connections
+        hide_disabled_blocks = Actions.TOGGLE_HIDE_DISABLED_BLOCKS.get_active()
         for element in self.get_connections() + self.get_blocks():
-            if Actions.TOGGLE_HIDE_DISABLED_BLOCKS.get_active() and not element.get_enabled():
+            if hide_disabled_blocks and not element.get_enabled():
                 continue  # skip hidden disabled blocks and connections
             element.draw(gc, window)
         #draw selected blocks on top of selected connections
@@ -346,6 +348,23 @@ class FlowGraph(Element):
         self.validate()
         self.create_labels()
         self.create_shapes()
+
+    def reload(self):
+        """
+        Reload flow-graph (with updated blocks)
+
+        Args:
+            page: the page to reload (None means current)
+        Returns:
+            False if some error occurred during import
+        """
+        success = False
+        data = self.export_data()
+        if data:
+            self.unselect()
+            success = self.import_data(data)
+            self.update()
+        return success
 
     ##########################################################################
     ## Get Selected
@@ -396,8 +415,9 @@ class FlowGraph(Element):
             #single select mode, break
             if not coor_m: break
         #update selected ports
-        self._old_selected_port = self._new_selected_port
-        self._new_selected_port = selected_port
+        if selected_port is not self._new_selected_port:
+            self._old_selected_port = self._new_selected_port
+            self._new_selected_port = selected_port
         return list(selected)
 
     def get_selected_connections(self):
@@ -470,12 +490,17 @@ class FlowGraph(Element):
             if self.get_ctrl_mask() or not (
                 new_selections and new_selections[0] in self.get_selected_elements()
             ): selected_elements = new_selections
-        else: #called from a mouse release
+            if self._old_selected_port:
+                self._old_selected_port.force_label_unhidden(False)
+                self.create_shapes()
+                self.queue_draw()
+            elif self._new_selected_port:
+                self._new_selected_port.force_label_unhidden()
+        else:  # called from a mouse release
             if not self.element_moved and (not self.get_selected_elements() or self.get_ctrl_mask()):
                 selected_elements = self.what_is_selected(self.get_coordinate(), self.press_coor)
         #this selection and the last were ports, try to connect them
-        if self._old_selected_port and self._new_selected_port and \
-            self._old_selected_port is not self._new_selected_port:
+        if self._old_selected_port and self._new_selected_port:
             try:
                 self.connect(self._old_selected_port, self._new_selected_port)
                 Actions.ELEMENT_CREATE()
@@ -574,7 +599,7 @@ class FlowGraph(Element):
                 self.create_shapes()
                 self.queue_draw()
         else:
-            #perform autoscrolling
+            #perform auto-scrolling
             width, height = self.get_size()
             x, y = coordinate
             h_adj = self.get_scroll_pane().get_hadjustment()
@@ -594,8 +619,12 @@ class FlowGraph(Element):
             if len(self.get_selected_elements()) == 1 and self.get_selected_element().is_connection():
                 Actions.ELEMENT_DELETE()
             #move the selected elements and record the new coordinate
-            X, Y = self.get_coordinate()
-            if not self.get_ctrl_mask(): self.move_selected((int(x - X), int(y - Y)))
-            self.set_coordinate((x, y))
+            if not self.get_ctrl_mask():
+                X, Y = self.get_coordinate()
+                dX, dY = int(x - X), int(y - Y)
+                active = Actions.TOGGLE_SNAP_TO_GRID.get_active() or self.get_mod1_mask()
+                if not active or abs(dX) >= Utils.CANVAS_GRID_SIZE or abs(dY) >= Utils.CANVAS_GRID_SIZE:
+                    self.move_selected((dX, dY))
+                    self.set_coordinate((x, y))
             #queue draw for animation
             self.queue_draw()

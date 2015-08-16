@@ -109,6 +109,7 @@ namespace gr {
 
       virtual void set_fft_size(const int fftsize) = 0;
       virtual int fft_size() const = 0;
+      virtual void set_time_per_fft(const double t) = 0;
       virtual void set_fft_average(const float fftavg) = 0;
       virtual float fft_average() const = 0;
       virtual void set_fft_window(const gr::filter::firdes::win_type win) = 0;
@@ -121,6 +122,7 @@ namespace gr {
 
       virtual void set_update_time(double t) = 0;
       virtual void set_title(const std::string &title) = 0;
+      virtual void set_time_title(const std::string &title) = 0;
       virtual void set_line_label(int which, const std::string &line) = 0;
       virtual void set_line_alpha(int which, double alpha) = 0;
       virtual void set_color_map(int which, const int color) = 0;
@@ -138,6 +140,7 @@ namespace gr {
 
       virtual void enable_menu(bool en=true) = 0;
       virtual void enable_grid(bool en=true) = 0;
+      virtual void disable_legend() = 0;
 
       QApplication *d_qApplication;
     };

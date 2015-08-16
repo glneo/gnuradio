@@ -28,7 +28,7 @@
 #include <gnuradio/tags.h>
 #include <boost/weak_ptr.hpp>
 #include <gnuradio/thread/thread.h>
-#include <deque>
+#include <map>
 
 namespace gr {
 
@@ -66,6 +66,11 @@ namespace gr {
      * \brief return size of this buffer in items
      */
     int bufsize() const { return d_bufsize; }
+
+    /*!
+     * \brief return the base address of the buffer
+     */
+    const char* base() const { return static_cast<const char*>(d_base); }
 
     /*!
      * \brief return pointer to write buffer.
@@ -125,8 +130,10 @@ namespace gr {
      */
     void prune_tags(uint64_t max_time);
 
-    std::deque<tag_t>::iterator get_tags_begin() { return d_item_tags.begin(); }
-    std::deque<tag_t>::iterator get_tags_end() { return d_item_tags.end(); }
+    std::multimap<uint64_t,tag_t>::iterator get_tags_begin() { return d_item_tags.begin(); }
+    std::multimap<uint64_t,tag_t>::iterator get_tags_end() { return d_item_tags.end(); }
+    std::multimap<uint64_t,tag_t>::iterator get_tags_lower_bound(uint64_t x) { return d_item_tags.lower_bound(x); }
+    std::multimap<uint64_t,tag_t>::iterator get_tags_upper_bound(uint64_t x) { return d_item_tags.upper_bound(x); }
 
     // -------------------------------------------------------------------------
 
@@ -157,7 +164,7 @@ namespace gr {
     unsigned int			d_write_index;	// in items [0,d_bufsize)
     uint64_t                            d_abs_write_offset; // num items written since the start
     bool				d_done;
-    std::deque<tag_t>                   d_item_tags;
+    std::multimap<uint64_t,tag_t>                   d_item_tags;
     uint64_t                            d_last_min_items_read;
 
     unsigned index_add(unsigned a, unsigned b)

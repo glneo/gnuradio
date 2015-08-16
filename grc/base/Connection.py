@@ -51,7 +51,7 @@ class Connection(Element):
         #ensure that this connection (source -> sink) is unique
         for connection in self.get_parent().get_connections():
             if connection.get_source() is source and connection.get_sink() is sink:
-                raise Exception('This connection between source and sink is not unique.')
+                raise LookupError('This connection between source and sink is not unique.')
         self._source = source
         self._sink = sink
         if source.get_type() == 'bus':
@@ -81,10 +81,28 @@ class Connection(Element):
         The ports must match in type.
         """
         Element.validate(self)
-        source_type = self.get_source().get_type()
-        sink_type = self.get_sink().get_type()
-        if source_type != sink_type:
-            self.add_error_message('Source type "%s" does not match sink type "%s".'%(source_type, sink_type))
+        platform = self.get_parent().get_parent()
+        source_domain = self.get_source().get_domain()
+        sink_domain = self.get_sink().get_domain()
+        if (source_domain, sink_domain) not in platform.get_connection_templates():
+            self.add_error_message('No connection known for domains "%s", "%s"'
+                                   % (source_domain, sink_domain))
+        too_many_other_sinks = (
+            source_domain in platform.get_domains() and
+            not platform.get_domain(key=source_domain)['multiple_sinks'] and
+            len(self.get_source().get_enabled_connections()) > 1
+        )
+        too_many_other_sources = (
+            sink_domain in platform.get_domains() and
+            not platform.get_domain(key=sink_domain)['multiple_sources'] and
+            len(self.get_sink().get_enabled_connections()) > 1
+        )
+        if too_many_other_sinks:
+            self.add_error_message(
+                'Domain "%s" can have only one downstream block' % source_domain)
+        if too_many_other_sources:
+            self.add_error_message(
+                'Domain "%s" can have only one upstream block' % sink_domain)
 
     def get_enabled(self):
         """

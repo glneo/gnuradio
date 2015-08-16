@@ -1,4 +1,4 @@
-# Copyright 2014 Free Software Foundation, Inc.
+# Copyright 2014,2015 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -27,6 +27,7 @@ include_directories(
     ${GR_ANALOG_INCLUDE_DIRS}
     ${GR_FEC_INCLUDE_DIRS}
     ${GNURADIO_RUNTIME_INCLUDE_DIRS}
+    ${VOLK_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
 )
 
@@ -34,7 +35,6 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 if(ENABLE_GR_CTRLPORT)
   ADD_DEFINITIONS(-DGR_CTRLPORT)
-  include_directories(${ICE_INCLUDE_DIR})
 endif(ENABLE_GR_CTRLPORT)
 
 ########################################################################
@@ -71,6 +71,39 @@ list(APPEND dtv_sources
   atsc/atsc_fake_single_viterbi.cc
   atsc/atsc_single_viterbi.cc
   atsc/atsc_viterbi_decoder_impl.cc
+  atsc/atsc_pad_impl.cc
+  atsc/atsc_randomizer_impl.cc
+  atsc/atsc_rs_encoder_impl.cc
+  atsc/atsc_interleaver_impl.cc
+  atsc/atsc_basic_trellis_encoder.cc
+  atsc/atsc_trellis_encoder_impl.cc
+  atsc/atsc_field_sync_mux_impl.cc
+  dvb/dvb_bbheader_bb_impl.cc
+  dvb/dvb_bbscrambler_bb_impl.cc
+  dvb/dvb_bch_bb_impl.cc
+  dvb/dvb_ldpc_bb_impl.cc
+  dvbt2/dvbt2_interleaver_bb_impl.cc
+  dvbt2/dvbt2_modulator_bc_impl.cc
+  dvbt2/dvbt2_cellinterleaver_cc_impl.cc
+  dvbt2/dvbt2_framemapper_cc_impl.cc
+  dvbt2/dvbt2_freqinterleaver_cc_impl.cc
+  dvbt2/dvbt2_pilotgenerator_cc_impl.cc
+  dvbt2/dvbt2_paprtr_cc_impl.cc
+  dvbt2/dvbt2_p1insertion_cc_impl.cc
+  dvbt2/dvbt2_miso_cc_impl.cc
+  dvbs2/dvbs2_interleaver_bb_impl.cc
+  dvbs2/dvbs2_modulator_bc_impl.cc
+  dvbs2/dvbs2_physical_cc_impl.cc
+  dvbt/dvbt_energy_dispersal_impl.cc
+  dvbt/dvbt_reed_solomon.cc
+  dvbt/dvbt_reed_solomon_enc_impl.cc
+  dvbt/dvbt_convolutional_interleaver_impl.cc
+  dvbt/dvbt_configure.cc
+  dvbt/dvbt_inner_coder_impl.cc
+  dvbt/dvbt_bit_inner_interleaver_impl.cc
+  dvbt/dvbt_symbol_inner_interleaver_impl.cc
+  dvbt/dvbt_map_impl.cc
+  dvbt/dvbt_reference_signals_impl.cc
 )
 
 if(ENABLE_GR_CTRLPORT)
@@ -83,6 +116,7 @@ list(APPEND dtv_libs
     gnuradio-analog
     gnuradio-filter
     gnuradio-fec
+    ${VOLK_LIBRARIES}
 )
 
 #Add Windows DLL resource file if using MSVC

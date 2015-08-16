@@ -88,6 +88,25 @@ public:
   notimplemented(const std::string &msg, pmt_t obj);
 };
 
+
+/*
+ * ------------------------------------------------------------------------
+ * Constants
+ * ------------------------------------------------------------------------
+ */
+
+PMT_API pmt_t get_PMT_NIL();
+PMT_API pmt_t get_PMT_T();
+PMT_API pmt_t get_PMT_F();
+PMT_API pmt_t get_PMT_EOF();
+
+#define PMT_NIL get_PMT_NIL()
+#define PMT_T get_PMT_T()
+#define PMT_F get_PMT_F()
+#define PMT_EOF get_PMT_EOF()
+
+
+
 /*
  * ------------------------------------------------------------------------
  * Booleans.  Two constants, #t and #f.
@@ -96,8 +115,6 @@ public:
  * I.e., there is a single false value, #f.
  * ------------------------------------------------------------------------
  */
-extern PMT_API const pmt_t PMT_T;	//< \#t : boolean true constant
-extern PMT_API const pmt_t PMT_F;	//< \#f : boolean false constant
 
 //! Return true if obj is \#t or \#f, else return false.
 PMT_API bool is_bool(pmt_t obj);
@@ -201,6 +218,7 @@ PMT_API bool is_real(pmt_t obj);
 
 //! Return the pmt value that represents double \p x.
 PMT_API pmt_t from_double(double x);
+PMT_API pmt_t from_float(float x);
 
 /*!
  * \brief Convert pmt to double if possible.
@@ -210,6 +228,15 @@ PMT_API pmt_t from_double(double x);
  * a wrong_type exception is raised.
  */
 PMT_API double to_double(pmt_t x);
+
+/*!
+ * \brief Convert pmt to float if possible.
+ *
+ * This basically is to_double() with a type-cast; the PMT stores
+ * the value as a double in any case. Use this when strict typing
+ * is required.
+ */
+PMT_API float to_float(pmt_t x);
 
 /*
  * ------------------------------------------------------------------------
@@ -248,9 +275,6 @@ PMT_API std::complex<double> to_complex(pmt_t z);
  *				Pairs
  * ------------------------------------------------------------------------
  */
-
-#define PMT_NIL get_PMT_NIL()
-PMT_API pmt_t get_PMT_NIL();
 
 //! Return true if \p x is the empty list, otherwise return false.
 PMT_API bool is_null(const pmt_t& x);
@@ -805,7 +829,6 @@ PMT_API bool list_has(pmt_t list, const pmt_t& item);
  *			     read / write
  * ------------------------------------------------------------------------
  */
-extern PMT_API const pmt_t PMT_EOF;	//< The end of file object
 
 //! return true if obj is the EOF object, otherwise return false.
 PMT_API bool is_eof_object(pmt_t obj);

@@ -23,7 +23,8 @@ import gtk
 import Utils
 import Actions
 
-class TextDisplay(gtk.TextView):
+
+class SimpleTextDisplay(gtk.TextView):
     """A non editable gtk text view."""
 
     def __init__(self, text=''):
@@ -41,10 +42,18 @@ class TextDisplay(gtk.TextView):
         self.set_cursor_visible(False)
         self.set_wrap_mode(gtk.WRAP_WORD_CHAR)
 
-        # Added for scroll locking
-        self.scroll_lock = True
 
-        # Add a signal for populating the popup menu
+class TextDisplay(SimpleTextDisplay):
+
+    def __init__(self, text=''):
+        """
+        TextDisplay constructor.
+
+        Args:
+            text: the text to display (string)
+        """
+        SimpleTextDisplay.__init__(self, text)
+        self.scroll_lock = True
         self.connect("populate-popup", self.populate_popup)
 
     def insert(self, line):
@@ -80,6 +89,12 @@ class TextDisplay(gtk.TextView):
         buffer = self.get_buffer()
         buffer.delete(buffer.get_start_iter(), buffer.get_end_iter())
 
+    def save(self, file_path):
+        report_file = open(file_path, 'w')
+        buffer = self.get_buffer()
+        report_file.write(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True))
+        report_file.close()
+
     # Callback functions to handle the scrolling lock and clear context menus options
     # Action functions are set by the ActionHandler's init function
     def clear_cb(self, menu_item, web_view):
@@ -87,6 +102,9 @@ class TextDisplay(gtk.TextView):
 
     def scroll_back_cb(self, menu_item, web_view):
         Actions.TOGGLE_SCROLL_LOCK()
+
+    def save_cb(self, menu_item, web_view):
+        Actions.SAVE_REPORTS()
 
     def populate_popup(self, view, menu):
         """Create a popup menu for the scroll lock and clear functions"""
@@ -97,13 +115,18 @@ class TextDisplay(gtk.TextView):
         lock.set_active(self.scroll_lock)
         lock.connect('activate', self.scroll_back_cb, view)
 
+        save = gtk.ImageMenuItem(gtk.STOCK_SAVE)
+        menu.append(save)
+        save.connect('activate', self.save_cb, view)
+
         clear = gtk.ImageMenuItem(gtk.STOCK_CLEAR)
         menu.append(clear)
         clear.connect('activate', self.clear_cb, view)
         menu.show_all()
         return False
 
-def MessageDialogHelper(type, buttons, title=None, markup=None):
+
+def MessageDialogHelper(type, buttons, title=None, markup=None, default_response=None, extra_buttons=None):
     """
     Create a modal message dialog and run it.
 
@@ -113,8 +136,10 @@ def MessageDialogHelper(type, buttons, title=None, markup=None):
         gtk.BUTTONS_NONE, gtk.BUTTONS_OK, gtk.BUTTONS_CLOSE, gtk.BUTTONS_CANCEL, gtk.BUTTONS_YES_NO, gtk.BUTTONS_OK_CANCEL
 
     Args:
-        tittle: the title of the window (string)
+        title: the title of the window (string)
         markup: the message text with pango markup
+        default_response: if set, determines which button is highlighted by default
+        extra_buttons: a tuple containing pairs of values; each value is the button's text and the button's return value
 
     Returns:
         the gtk response from run()
@@ -122,6 +147,8 @@ def MessageDialogHelper(type, buttons, title=None, markup=None):
     message_dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, type, buttons)
     if title: message_dialog.set_title(title)
     if markup: message_dialog.set_markup(markup)
+    if extra_buttons: message_dialog.add_buttons(*extra_buttons)
+    if default_response: message_dialog.set_default_response(default_response)
     response = message_dialog.run()
     message_dialog.destroy()
     return response

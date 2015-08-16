@@ -37,7 +37,6 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 if(ENABLE_GR_CTRLPORT)
   ADD_DEFINITIONS(-DGR_CTRLPORT)
-  include_directories(${ICE_INCLUDE_DIR})
 endif(ENABLE_GR_CTRLPORT)
 
 ########################################################################
@@ -97,10 +96,10 @@ IF(MSVC)
 ENDIF(MSVC)
 
 list(APPEND analog_libs
-    volk
     gnuradio-runtime
     gnuradio-blocks
     gnuradio-filter
+    ${VOLK_LIBRARIES}
     ${Boost_LIBRARIES}
 )
 
@@ -113,7 +112,6 @@ if(ENABLE_STATIC_LIBS)
   if(ENABLE_GR_CTRLPORT)
     # Remove GR_CTRLPORT set this target's definitions.
     # Makes sure we don't try to use ControlPort stuff in source files
-    # since Ice will not work with static libs.
     GET_DIRECTORY_PROPERTY(STATIC_DEFS COMPILE_DEFINITIONS)
     list(REMOVE_ITEM STATIC_DEFS "GR_CTRLPORT")
     SET_PROPERTY(DIRECTORY PROPERTY COMPILE_DEFINITIONS "${STATIC_DEFS}")
@@ -139,7 +137,7 @@ if(ENABLE_STATIC_LIBS)
 endif(ENABLE_STATIC_LIBS)
 
 ########################################################################
-# QA C++ Code for gr-filter
+# QA C++ Code for gr-analog
 ########################################################################
 if(ENABLE_TESTING)
   include(GrTest)

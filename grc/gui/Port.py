@@ -18,10 +18,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 """
 
 from Element import Element
-from Constants import \
-    PORT_SEPARATION, CONNECTOR_EXTENSION_MINIMAL, \
-    CONNECTOR_EXTENSION_INCREMENT, \
-    PORT_LABEL_PADDING, PORT_MIN_WIDTH
+from Constants import (
+    PORT_SEPARATION, PORT_SPACING, CONNECTOR_EXTENSION_MINIMAL,
+    CONNECTOR_EXTENSION_INCREMENT, CANVAS_GRID_SIZE,
+    PORT_LABEL_PADDING, PORT_MIN_WIDTH, PORT_LABEL_HIDDEN_WIDTH, PORT_FONT
+)
+from .. base.Constants import DEFAULT_DOMAIN, GR_MESSAGE_DOMAIN
 import Utils
 import Actions
 import Colors
@@ -29,10 +31,8 @@ import pygtk
 pygtk.require('2.0')
 import gtk
 
-PORT_HIDDEN_MARKUP_TMPL="""\
-<span foreground="black" font_desc="Sans 7.5"> </span>"""
 PORT_MARKUP_TMPL="""\
-<span foreground="black" font_desc="Sans 7.5">$encode($port.get_name())</span>"""
+<span foreground="black" font_desc="$font">$encode($port.get_name())</span>"""
 
 
 class Port(Element):
@@ -45,21 +45,30 @@ class Port(Element):
         """
         Element.__init__(self)
         self.W = self.H = self.w = self.h = 0
-        self._connector_coordinate = (0,0)
+        self._connector_coordinate = (0, 0)
         self._connector_length = 0
-        self._label_hidden = True
+        self._hovering = True
+        self._force_label_unhidden = False
 
     def create_shapes(self):
         """Create new areas and labels for the port."""
         Element.create_shapes(self)
+        if self.get_hide():
+            return  # this port is hidden, no need to create shapes
+        if self.get_domain() == GR_MESSAGE_DOMAIN:
+            pass
+        elif self.get_domain() != DEFAULT_DOMAIN:
+            self.line_attributes[0] = 2
         #get current rotation
         rotation = self.get_rotation()
         #get all sibling ports
-        if self.is_source(): ports = self.get_parent().get_sources_gui()
-        elif self.is_sink(): ports = self.get_parent().get_sinks_gui()
+        if self.is_source():
+            ports = self.get_parent().get_sources_gui()
+        elif self.is_sink():
+            ports = self.get_parent().get_sinks_gui()
         #get the max width
         self.W = max([port.W for port in ports] + [PORT_MIN_WIDTH])
-        W = self.W if not self.label_hidden() else 10
+        W = self.W if not self._label_hidden() else PORT_LABEL_HIDDEN_WIDTH
         #get a numeric index for this port relative to its sibling ports
         try:
             index = ports.index(self)
@@ -69,57 +78,57 @@ class Port(Element):
             return
         length = len(filter(lambda p: not p.get_hide(), ports))
         #reverse the order of ports for these rotations
-        if rotation in (180, 270): index = length-index-1
-        offset = (self.get_parent().H - length*self.H - (length-1)*PORT_SEPARATION)/2
+        if rotation in (180, 270):
+            index = length-index-1
+
+        port_separation = PORT_SEPARATION \
+            if self.get_parent().has_busses[self.is_source()] \
+            else max([port.H for port in ports]) + PORT_SPACING
+
+        offset = (self.get_parent().H - (length-1)*port_separation - self.H)/2
         #create areas and connector coordinates
         if (self.is_sink() and rotation == 0) or (self.is_source() and rotation == 180):
-            x = -1*W
-            y = (PORT_SEPARATION+self.H)*index+offset
+            x = -W
+            y = port_separation*index+offset
             self.add_area((x, y), (W, self.H))
             self._connector_coordinate = (x-1, y+self.H/2)
         elif (self.is_source() and rotation == 0) or (self.is_sink() and rotation == 180):
             x = self.get_parent().W
-            y = (PORT_SEPARATION+self.H)*index+offset
+            y = port_separation*index+offset
             self.add_area((x, y), (W, self.H))
             self._connector_coordinate = (x+1+W, y+self.H/2)
         elif (self.is_source() and rotation == 90) or (self.is_sink() and rotation == 270):
-            y = -1*W
-            x = (PORT_SEPARATION+self.H)*index+offset
+            y = -W
+            x = port_separation*index+offset
             self.add_area((x, y), (self.H, W))
             self._connector_coordinate = (x+self.H/2, y-1)
         elif (self.is_sink() and rotation == 90) or (self.is_source() and rotation == 270):
             y = self.get_parent().W
-            x = (PORT_SEPARATION+self.H)*index+offset
+            x = port_separation*index+offset
             self.add_area((x, y), (self.H, W))
             self._connector_coordinate = (x+self.H/2, y+1+W)
         #the connector length
         self._connector_length = CONNECTOR_EXTENSION_MINIMAL + CONNECTOR_EXTENSION_INCREMENT*index
 
-    def modify_height(self, start_height):
-        type_dict = {'bus':(lambda a: a * 3)};
-
-        if self.get_type() in type_dict:
-            return type_dict[self.get_type()](start_height);
-        else:
-            return start_height;
-
     def create_labels(self):
         """Create the labels for the socket."""
         Element.create_labels(self)
         self._bg_color = Colors.get_color(self.get_color())
-        #create the layout
+        # create the layout
         layout = gtk.DrawingArea().create_pango_layout('')
-        layout.set_markup(Utils.parse_template(PORT_MARKUP_TMPL, port=self))
+        layout.set_markup(Utils.parse_template(PORT_MARKUP_TMPL, port=self, font=PORT_FONT))
         self.w, self.h = layout.get_pixel_size()
-        self.W, self.H = 2*PORT_LABEL_PADDING + self.w, 2*PORT_LABEL_PADDING+self.h
-        self.H = self.modify_height(self.H)
-        #create the pixmap
+        self.W = 2 * PORT_LABEL_PADDING + self.w
+        self.H = 2 * PORT_LABEL_PADDING + self.h * (
+            3 if self.get_type() == 'bus' else 1)
+        self.H += self.H % 2
+        # create the pixmap
         pixmap = self.get_parent().get_parent().new_pixmap(self.w, self.h)
         gc = pixmap.new_gc()
         gc.set_foreground(self._bg_color)
         pixmap.draw_rectangle(gc, True, 0, 0, self.w, self.h)
         pixmap.draw_layout(gc, 0, 0, layout)
-        #create vertical and horizontal pixmaps
+        # create vertical and horizontal pixmaps
         self.horizontal_label = pixmap
         if self.is_vertical():
             self.vertical_label = self.get_parent().get_parent().new_pixmap(self.h, self.w)
@@ -136,12 +145,13 @@ class Port(Element):
         Element.draw(
             self, gc, window, bg_color=self._bg_color,
             border_color=self.is_highlighted() and Colors.HIGHLIGHT_COLOR or
-                         self.get_parent().is_dummy_block() and Colors.MISSING_BLOCK_BORDER_COLOR or Colors.BORDER_COLOR,
+                         self.get_parent().is_dummy_block() and Colors.MISSING_BLOCK_BORDER_COLOR or
+                         Colors.BORDER_COLOR,
         )
-        if self.label_hidden():
-            return
-        X,Y = self.get_coordinate()
-        (x,y),(w,h) = self._areas_list[0] #use the first area's sizes to place the labels
+        if not self._areas_list or self._label_hidden():
+            return  # this port is either hidden (no areas) or folded (no label)
+        X, Y = self.get_coordinate()
+        (x, y), (w, h) = self._areas_list[0]  # use the first area's sizes to place the labels
         if self.is_horizontal():
             window.draw_drawable(gc, self.horizontal_label, 0, 0, x+X+(self.W-self.w)/2, y+Y+(self.H-self.h)/2, -1, -1)
         elif self.is_vertical():
@@ -234,25 +244,34 @@ class Port(Element):
         """
         return self.get_parent().is_highlighted()
 
-    def label_hidden(self):
+    def _label_hidden(self):
         """
-        Figure out if the label should be shown
+        Figure out if the label should be hidden
 
         Returns:
-            true if the label should be hidden
+            true if the label should not be shown
         """
-        return self._label_hidden and Actions.TOGGLE_AUTO_HIDE_PORT_LABELS.get_active()
+        return self._hovering and not self._force_label_unhidden and Actions.TOGGLE_AUTO_HIDE_PORT_LABELS.get_active()
+
+    def force_label_unhidden(self, enable=True):
+        """
+        Disable showing the label on mouse-over for this port
+
+        Args:
+            enable: true to override the mouse-over behaviour
+        """
+        self._force_label_unhidden = enable
 
     def mouse_over(self):
         """
         Called from flow graph on mouse-over
         """
-        self._label_hidden = False
+        self._hovering = False
         return Actions.TOGGLE_AUTO_HIDE_PORT_LABELS.get_active()  # only redraw if necessary
 
     def mouse_out(self):
         """
         Called from flow graph on mouse-out
         """
-        self._label_hidden = True
+        self._hovering = True
         return Actions.TOGGLE_AUTO_HIDE_PORT_LABELS.get_active()  # only redraw if necessary

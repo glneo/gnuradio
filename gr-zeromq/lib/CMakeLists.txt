@@ -31,7 +31,6 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 if(ENABLE_GR_CTRLPORT)
   ADD_DEFINITIONS(-DGR_CTRLPORT)
-  include_directories(${ICE_INCLUDE_DIR})
 endif(ENABLE_GR_CTRLPORT)
 
 ########################################################################
@@ -39,11 +38,18 @@ endif(ENABLE_GR_CTRLPORT)
 ########################################################################
 list(APPEND zeromq_sources
   pub_sink_impl.cc
+  pub_msg_sink_impl.cc
   sub_source_impl.cc
+  sub_msg_source_impl.cc
   pull_source_impl.cc
+  pull_msg_source_impl.cc
   push_sink_impl.cc
+  push_msg_sink_impl.cc
   rep_sink_impl.cc
+  rep_msg_sink_impl.cc
   req_source_impl.cc
+  req_msg_source_impl.cc
+  tag_headers.cc
 )
 
 #Add Windows DLL resource file if using MSVC
@@ -74,7 +80,6 @@ if(ENABLE_STATIC_LIBS)
   if(ENABLE_GR_CTRLPORT)
     # Remove GR_CTRLPORT set this target's definitions.
     # Makes sure we don't try to use ControlPort stuff in source files
-    # since Ice will not work with static libs.
     GET_DIRECTORY_PROPERTY(STATIC_DEFS COMPILE_DEFINITIONS)
     list(REMOVE_ITEM STATIC_DEFS "GR_CTRLPORT")
     SET_PROPERTY(DIRECTORY PROPERTY COMPILE_DEFINITIONS "${STATIC_DEFS}")

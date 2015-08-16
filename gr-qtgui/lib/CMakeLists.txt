@@ -25,12 +25,15 @@ set(qtgui_moc_hdrs
     ${qtgui_mod_includedir}/spectrumdisplayform.h
     ${qtgui_mod_includedir}/displayform.h
     ${qtgui_mod_includedir}/timedisplayform.h
+    ${qtgui_mod_includedir}/timecontrolpanel.h
     ${qtgui_mod_includedir}/timerasterdisplayform.h
     ${qtgui_mod_includedir}/freqdisplayform.h
+    ${qtgui_mod_includedir}/freqcontrolpanel.h
     ${qtgui_mod_includedir}/constellationdisplayform.h
     ${qtgui_mod_includedir}/waterfalldisplayform.h
     ${qtgui_mod_includedir}/histogramdisplayform.h
     ${qtgui_mod_includedir}/numberdisplayform.h
+    ${qtgui_mod_includedir}/vectordisplayform.h
     ${qtgui_mod_includedir}/form_menus.h
     ${qtgui_mod_includedir}/DisplayPlot.h
     ${qtgui_mod_includedir}/FrequencyDisplayPlot.h
@@ -39,6 +42,7 @@ set(qtgui_moc_hdrs
     ${qtgui_mod_includedir}/WaterfallDisplayPlot.h
     ${qtgui_mod_includedir}/ConstellationDisplayPlot.h
     ${qtgui_mod_includedir}/HistogramDisplayPlot.h
+    ${qtgui_mod_includedir}/VectorDisplayPlot.h
 )
 QT4_WRAP_CPP(qtgui_moc_sources ${qtgui_moc_hdrs})
 QT4_WRAP_UI(qtgui_ui_hdrs spectrumdisplayform.ui)
@@ -62,11 +66,14 @@ set(qtgui_sources
     waterfallGlobalData.cc
     ConstellationDisplayPlot.cc
     HistogramDisplayPlot.cc
+    VectorDisplayPlot.cc
     spectrumdisplayform.cc
     displayform.cc
     timedisplayform.cc
+    timecontrolpanel.cc
     timerasterdisplayform.cc
     freqdisplayform.cc
+    freqcontrolpanel.cc
     constellationdisplayform.cc
     histogramdisplayform.cc
     numberdisplayform.cc
@@ -90,6 +97,8 @@ set(qtgui_sources
     number_sink_impl.cc
     qtgui_util.cc
     ber_sink_b_impl.cc
+    vectordisplayform.cc
+    vector_sink_f_impl.cc
 )
 
 #Add Windows DLL resource file if using MSVC
@@ -134,7 +143,6 @@ include_directories(${PYTHON_INCLUDE_PATH}) #deprecated for dirs (cmake 2.6)
 
 if(ENABLE_GR_CTRLPORT)
   ADD_DEFINITIONS(-DGR_CTRLPORT)
-  include_directories(${ICE_INCLUDE_DIR})
 endif(ENABLE_GR_CTRLPORT)
 
 ########################################################################
@@ -144,7 +152,7 @@ list(APPEND qtgui_libs
     gnuradio-runtime
     gnuradio-fft
     gnuradio-filter
-    volk
+    ${VOLK_LIBRARIES}
     ${QWT_LIBRARIES}
     ${QT_LIBRARIES}
     ${FFTW3F_LIBRARIES}
@@ -168,7 +176,6 @@ if(ENABLE_STATIC_LIBS)
   if(ENABLE_GR_CTRLPORT)
     # Remove GR_CTRLPORT set this target's definitions.
     # Makes sure we don't try to use ControlPort stuff in source files
-    # since Ice will not work with static libs.
     GET_DIRECTORY_PROPERTY(STATIC_DEFS COMPILE_DEFINITIONS)
     list(REMOVE_ITEM STATIC_DEFS "GR_CTRLPORT")
     SET_PROPERTY(DIRECTORY PROPERTY COMPILE_DEFINITIONS "${STATIC_DEFS}")

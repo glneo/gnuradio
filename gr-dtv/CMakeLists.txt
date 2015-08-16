@@ -93,6 +93,7 @@ if(ENABLE_PYTHON)
     add_subdirectory(apps)
 endif(ENABLE_PYTHON)
 add_subdirectory(doc)
+add_subdirectory(examples/c++)
 
 ########################################################################
 # Create Pkg Config File

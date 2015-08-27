@@ -31,18 +31,18 @@ int main(int argc, char **argv)
 {
 	char *infile;
 	char *outfile;
-	
+
 	if(argc == 3)
 	{
 		infile = argv[1];
 		outfile = argv[2];
 	}
-    	else
-    	{
-    		printf("usage: %s input_file output_file.ts\n", argv[0]);
-        	return -1;
-        }
-        
+	else
+	{
+		printf("usage: %s input_file output_file.ts\n", argv[0]);
+		return -1;
+	}
+
 	// Construct a top block that will contain flowgraph blocks.
 	top_block_sptr tb = make_top_block("file_atsc_rx");
 	
@@ -55,13 +55,13 @@ int main(int argc, char **argv)
 	float output_rate = ATSC_SYMBOL_RATE * SPS;
 	
 	// Create matched RX filter with RRC response for fractional interpolator.
-        int nfilts = 16;
-        float filter_rate = SAMPLE_RATE * nfilts;
-        float symbol_rate = ATSC_SYMBOL_RATE / 2.0; // One-sided bandwidth of sideband
-        float excess_bw = 0.1152; // 1.0 - ( 0.5 * ATSC_SYMBOL_RATE / ATSC_CHANNEL_BW ) // ~10.3%
-        int ntaps = (int)( ( 2 * ATSC_RRC_SYMS + 1 ) * SPS * nfilts );
-        float interp = output_rate / SAMPLE_RATE;
-        float gain = nfilts * symbol_rate / filter_rate;
+	int nfilts = 16;
+	float filter_rate = SAMPLE_RATE * nfilts;
+	float symbol_rate = ATSC_SYMBOL_RATE / 2.0; // One-sided bandwidth of sideband
+	float excess_bw = 0.1152; // 1.0 - ( 0.5 * ATSC_SYMBOL_RATE / ATSC_CHANNEL_BW ) // ~10.3%
+	int ntaps = (int)( ( 2 * ATSC_RRC_SYMS + 1 ) * SPS * nfilts );
+	float interp = output_rate / SAMPLE_RATE;
+	float gain = nfilts * symbol_rate / filter_rate;
 	std::vector<float> rrc_taps = filter::firdes::root_raised_cosine(gain,		// Filter gain
 	                                                                 filter_rate,	// PFB filter prototype rate
 	                                                                 symbol_rate,	// ATSC symbol rate
@@ -69,16 +69,16 @@ int main(int argc, char **argv)
 	                                                                 ntaps);	// Length of filter
 
 	// ATSC receiver filter/interpolator
-        filter::pfb_arb_resampler_ccf::sptr pfb = filter::pfb_arb_resampler_ccf::make(interp, rrc_taps, nfilts);
+	filter::pfb_arb_resampler_ccf::sptr pfb = filter::pfb_arb_resampler_ccf::make(interp, rrc_taps, nfilts);
 
 	// Lock on to pilot tone, shift to DC, then discard Q channel
-        dtv::atsc_fpll::sptr pll = dtv::atsc_fpll::make(output_rate);
+	dtv::atsc_fpll::sptr pll = dtv::atsc_fpll::make(output_rate);
 
 	// Remove pilot tone now at DC
-        filter::dc_blocker_ff::sptr dcr = filter::dc_blocker_ff::make(4096);
+	filter::dc_blocker_ff::sptr dcr = filter::dc_blocker_ff::make(4096);
 
 	// Normalize signal to proper constellation amplitude
-        analog::agc_ff::sptr agc = analog::agc_ff::make(1e-5, 4.0);
+	analog::agc_ff::sptr agc = analog::agc_ff::make(1e-5, 4.0);
 
 	// Synchronize bit and segement timing
 	dtv::atsc_sync::sptr btl = dtv::atsc_sync::make(output_rate);
